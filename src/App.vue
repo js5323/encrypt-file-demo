@@ -14,7 +14,10 @@ const crypto = require("crypto");
 
 // https://github.com/brix/crypto-js/issues/136
 // https://github.com/brix/crypto-js/issues/136#issuecomment-984441714
+
 // sjcl
+// http://bitwiseshiftleft.github.io/sjcl/doc/
+
 // https://developer.mozilla.org/en-US/docs/Web/API/AesGcmParams
 // https://github.com/kingller/pandora-aes
 
