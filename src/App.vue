@@ -10,7 +10,13 @@
 import { Buffer } from "buffer";
 const crypto = require("crypto");
 
-// www.cnblogs.com/shenjp/p/16423487.html
+// https://www.cnblogs.com/shenjp/p/16423487.html
+
+// https://github.com/brix/crypto-js/issues/136
+// https://github.com/brix/crypto-js/issues/136#issuecomment-984441714
+// sjcl
+// https://developer.mozilla.org/en-US/docs/Web/API/AesGcmParams
+// https://github.com/kingller/pandora-aes
 
 /**
  * aes-128-gcm 加密
