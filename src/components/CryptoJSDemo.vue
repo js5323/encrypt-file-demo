@@ -1,19 +1,26 @@
 <template>
   <div class="wrapper">
-    <label for="pad">Public Key:</label>
-    <input v-model="publicKey" />
+    <h3 @click="show = !show">crypto-js</h3>
+    <div v-show="show" class="cont">
+      <div>
+        <label for="pad">Public Key:</label>
+        <input v-model="publicKey" />
+      </div>
 
-    <label for="pad">Encode File:</label>
-    <input ref="file" type="file" @change="handleChange" />
+      <div>
+        <label for="pad">Encode File:</label>
+        <input ref="file" type="file" @change="handleChange" />
+      </div>
 
-    <button @click="encrypt">Encrypt</button>
+      <button @click="encrypt">Encrypt</button>
 
-    <hr />
+      <div style="margin-top: 15px">
+        <label for="pad">Decode File:</label>
+        <input ref="file" type="file" @change="handleChange2" />
+      </div>
 
-    <label for="pad">Decode File:</label>
-    <input ref="file" type="file" @change="handleChange2" />
-
-    <button @click="decrypt">Decrypt</button>
+      <button @click="decrypt">Decrypt</button>
+    </div>
   </div>
 </template>
 
@@ -31,9 +38,10 @@ export default {
     return {
       inputFile: null,
       publicKey: "adoxb42lk35nsfgl",
-      iv: "",
+      iv: "a12xb42lab5nsjga",
       decodeFile: null,
       encrypted: null,
+      show: true,
     };
   },
   methods: {
@@ -54,19 +62,15 @@ export default {
         let u8Array = new Uint8Array(reader.result);
         let wordArray = convertUint8ArrayToWordArray(u8Array); // Convert: ArrayBuffer -> WordArray
 
-        console.log(this.inputFile.name);
+        console.log("before encrypt:");
+        console.log(wordArray);
 
         let encrypted = CryptoJS.AES.encrypt(wordArray, this.publicKey, {
-          mode: CryptoJS.mode.CBC,
-          padding: CryptoJS.pad.Pkcs7,
-        }); // Encryption: I: WordArray -> O: -> Base64 encoded string (OpenSSL-format)
-        console.log("before u8Array:", u8Array);
-        console.log(encrypted);
+          iv: this.iv,
+        });
+
+        console.log("encrypt result:");
         console.log(encrypted.ciphertext);
-
-        window.encrypted = encrypted;
-
-        this.iv = encrypted.iv.toString();
 
         let result = convertWordArrayToUint8Array(encrypted.ciphertext);
         let fileEnc = new Blob([result]); // Create blob from string
@@ -91,18 +95,18 @@ export default {
       const reader = new FileReader();
 
       reader.onload = () => {
-        let u8Array = new Uint8Array(reader.result);
-        let wordArray = convertUint8ArrayToWordArray(u8Array);
+        // wordArray 已经是与encrypt后的结果一致了
+        let wordArray = CryptoJS.lib.WordArray.create(reader.result);
 
-        let ciphertextParams = CryptoJS.lib.CipherParams.create({
-          ciphertext: wordArray,
-          iv: CryptoJS.enc.Hex.parse(this.iv), // parse the IV
-          mode: CryptoJS.mode.CBC,
-          padding: CryptoJS.pad.Pkcs7,
+        console.log("get encrypt file result:");
+        console.log(wordArray);
+
+        // 直接将wordArray放入decrypt无法解密
+        let decrypted = CryptoJS.AES.decrypt(wordArray, this.publicKey, {
+          iv: this.iv,
         });
 
-        let decrypted = CryptoJS.AES.decrypt(ciphertextParams, this.publicKey); // Encryption: I: WordArray -> O: -> Base64 encoded string (OpenSSL-format)
-
+        console.log("decrypted file result:");
         console.log(decrypted);
 
         let result = convertWordArrayToUint8Array(decrypted);
@@ -130,8 +134,19 @@ export default {
 
 <style scoped lang="scss">
 .wrapper {
-  display: flex;
-  flex-direction: column;
+  border: 1px solid #535bf2;
+  padding: 20px;
+  margin-bottom: 16px;
+
+  .cont {
+    border-top: 1px solid #535bf2;
+    padding-top: 15px;
+    margin-top: 15px;
+  }
+
+  h3 {
+    margin: 0;
+  }
 
   input,
   select {

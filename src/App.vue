@@ -1,13 +1,16 @@
 <template>
   <div class="wrapper">
     <CryptoJSDemo />
+
+    <NodeForge />
   </div>
 </template>
 
 <script>
 import CryptoJSDemo from "./components/CryptoJSDemo.vue";
+import NodeForge from "./components/NodeForge.vue";
 export default {
-  components: { CryptoJSDemo },
+  components: { CryptoJSDemo, NodeForge },
 };
 </script>
 

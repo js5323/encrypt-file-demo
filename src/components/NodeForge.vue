@@ -1,31 +1,44 @@
 <template>
   <div class="wrapper">
-    <label for="pad">Public Key:</label>
-    <input v-model="publicKey" />
+    <h3 @click="show = !show">node-froge</h3>
+    <div v-show="show" class="cont">
+      <div>
+        <label for="pad">Public Key:</label>
+        <input v-model="publicKey" />
+      </div>
 
-    <label for="pad">Encode File:</label>
-    <input ref="file" type="file" @change="handleChange" />
+      <div>
+        <label for="pad">Encode File:</label>
+        <input ref="file" type="file" @change="handleChange" />
+      </div>
 
-    <button @click="encrypt">Encrypt</button>
+      <button @click="encrypt">Encrypt</button>
 
-    <hr />
+      <div style="margin-top: 15px">
+        <label for="pad">Decode File:</label>
+        <input ref="file" type="file" @change="handleChange2" />
+      </div>
 
-    <label for="pad">Decode File:</label>
-    <input ref="file" type="file" @change="handleChange2" />
-
-    <button @click="decrypt">Decrypt</button>
+      <button @click="decrypt">Decrypt</button>
+    </div>
   </div>
 </template>
 
 <script>
+import forge from "node-forge";
+import { convertBinaryStringToUint8Array } from "../utils";
+
+window.forge = forge;
+
 export default {
   data() {
     return {
       inputFile: null,
       publicKey: "adoxb42lk35nsfgl",
-      iv: "",
+      iv: "a12xb42lab5nsjga",
       decodeFile: null,
       encrypted: null,
+      show: false,
     };
   },
   methods: {
@@ -43,36 +56,34 @@ export default {
       const reader = new FileReader();
 
       reader.onload = () => {
-        let u8Array = new Uint8Array(reader.result);
-        let wordArray = convertUint8ArrayToWordArray(u8Array); // Convert: ArrayBuffer -> WordArray
+        // encrypt some bytes using CBC mode
+        // (other modes include: ECB, CFB, OFB, CTR, and GCM)
+        // Note: CBC and ECB modes use PKCS#7 padding as default
+        var cipher = forge.cipher.createCipher("AES-CBC", this.publicKey);
+        cipher.start({ iv: this.iv });
+        cipher.update(forge.util.createBuffer(reader.result));
+        cipher.finish();
+        var encrypted = convertBinaryStringToUint8Array(cipher.output.bytes());
 
-        // console.log(this.inputFile.name);
-
-        // let encrypted = CryptoJS.AES.encrypt(wordArray, this.publicKey, {
-        //   mode: CryptoJS.mode.CBC,
-        //   padding: CryptoJS.pad.Pkcs7,
-        // }); // Encryption: I: WordArray -> O: -> Base64 encoded string (OpenSSL-format)
-        // console.log("before u8Array:", u8Array);
+        // console.group("encrypt source");
+        // console.log(reader.result);
+        // console.groupEnd();
+        // console.group("encrypt result");
         // console.log(encrypted);
-        // console.log(encrypted.ciphertext);
+        // console.groupEnd();
 
-        // window.encrypted = encrypted;
+        let fileEnc = new Blob([encrypted]); // Create blob from string
 
-        // this.iv = encrypted.iv.toString();
-
-        // let result = convertWordArrayToUint8Array(encrypted.ciphertext);
-        // let fileEnc = new Blob([result]); // Create blob from string
-
-        // let a = document.createElement("a");
-        // let url = window.URL.createObjectURL(fileEnc);
-        // let filename = this.iv + ".enc";
-        // a.href = url;
-        // a.download = filename;
-        // a.click();
-        // window.URL.revokeObjectURL(url);
+        let a = document.createElement("a");
+        let url = window.URL.createObjectURL(fileEnc);
+        let filename = "encrypt-" + this.iv + ".enc";
+        a.href = url;
+        a.download = filename;
+        a.click();
+        window.URL.revokeObjectURL(url);
       };
 
-      reader.readAsArrayBuffer(this.inputFile);
+      reader.readAsBinaryString(this.inputFile);
     },
 
     decrypt() {
@@ -83,45 +94,61 @@ export default {
       const reader = new FileReader();
 
       reader.onload = () => {
-        let u8Array = new Uint8Array(reader.result);
-        let wordArray = convertUint8ArrayToWordArray(u8Array);
+        // decrypt some bytes using CBC mode
+        // (other modes include: CFB, OFB, CTR, and GCM)
+        var decipher = forge.cipher.createDecipher("AES-CBC", this.publicKey);
+        decipher.start({ iv: this.iv });
+        decipher.update(forge.util.createBuffer(reader.result));
+        decipher.finish();
+        let decrypted = convertBinaryStringToUint8Array(
+          decipher.output.bytes()
+        );
 
-        // let ciphertextParams = CryptoJS.lib.CipherParams.create({
-        //   ciphertext: wordArray,
-        //   iv: CryptoJS.enc.Hex.parse(this.iv), // parse the IV
-        //   mode: CryptoJS.mode.CBC,
-        //   padding: CryptoJS.pad.Pkcs7,
-        // });
+        // console.group("read encrypt result");
+        // console.log(reader.result);
+        // console.groupEnd();
 
-        // let decrypted = CryptoJS.AES.decrypt(ciphertextParams, this.publicKey); // Encryption: I: WordArray -> O: -> Base64 encoded string (OpenSSL-format)
+        // reader.result should be same with encrypted bytes
 
+        // console.group("decrypt result");
         // console.log(decrypted);
+        // console.groupEnd();
 
-        // let result = convertWordArrayToUint8Array(decrypted);
-        // let fileEnc = new Blob([result], {
-        //   type: "application/pdf",
-        // }); // Create blob from string
+        let fileDecrypt = new Blob([decrypted], {
+          type: "application/pdf",
+        });
 
-        // console.log("after:", result);
-
-        // let a = document.createElement("a");
-        // let url = window.URL.createObjectURL(fileEnc);
-        // let filename = `decrypted-${new Date().getTime()}.pdf`;
-        // a.href = url;
-        // a.download = filename;
-        // a.click();
-        // window.URL.revokeObjectURL(url);
+        let a = document.createElement("a");
+        let url = window.URL.createObjectURL(fileDecrypt);
+        let filename = `decrypted-${this.iv}.pdf`;
+        a.href = url;
+        a.download = filename;
+        a.click();
+        window.URL.revokeObjectURL(url);
       };
 
-      reader.readAsArrayBuffer(this.decodeFile);
+      reader.readAsBinaryString(this.decodeFile);
     },
   },
-  mounted() {},
 };
 </script>
 
 <style scoped lang="scss">
 .wrapper {
+  border: 1px solid #535bf2;
+  padding: 20px;
+  margin-bottom: 16px;
+
+  .cont {
+    border-top: 1px solid #535bf2;
+    padding-top: 15px;
+    margin-top: 15px;
+  }
+
+  h3 {
+    margin: 0;
+  }
+
   input,
   select {
     margin-bottom: 16px;
