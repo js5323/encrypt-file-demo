@@ -8,6 +8,11 @@
       </div>
 
       <div>
+        <label for="pad">IV:</label>
+        <input v-model="iv" />
+      </div>
+
+      <div>
         <label for="pad">Encode File:</label>
         <input ref="file" type="file" @change="handleChange" />
       </div>
@@ -19,6 +24,11 @@
         <input ref="file" type="file" @change="handleChange2" />
       </div>
 
+      <div>
+        <label for="pad">Decrypted File Name:</label>
+        <input v-model="decryptedFileName" />
+      </div>
+
       <button @click="decrypt">Decrypt</button>
     </div>
   </div>
@@ -27,8 +37,9 @@
 <script>
 import CryptoJS from "crypto-js";
 import {
-  convertUint8ArrayToWordArray,
   convertWordArrayToUint8Array,
+  downloadBlob,
+  readAsArrayBuffer,
 } from "../utils";
 
 window.CryptoJS = CryptoJS;
@@ -42,6 +53,7 @@ export default {
       decodeFile: null,
       encrypted: null,
       show: true,
+      decryptedFileName: `decrypt-by-crypto-js-${new Date().getTime()}.pdf`,
     };
   },
   methods: {
@@ -51,81 +63,68 @@ export default {
     handleChange2(e) {
       this.decodeFile = e.target.files[0];
     },
-    encrypt() {
+    async encrypt() {
       if (!this.inputFile) {
         return;
       }
 
-      const reader = new FileReader();
+      const fileArrBuffer = await readAsArrayBuffer(this.inputFile);
+      let wordArray = CryptoJS.lib.WordArray.create(fileArrBuffer); // Convert: ArrayBuffer -> WordArray
 
-      reader.onload = () => {
-        let u8Array = new Uint8Array(reader.result);
-        let wordArray = convertUint8ArrayToWordArray(u8Array); // Convert: ArrayBuffer -> WordArray
+      console.log("before encrypt:");
+      console.log(wordArray);
 
-        console.log("before encrypt:");
-        console.log(wordArray);
+      let encrypted = CryptoJS.AES.encrypt(
+        wordArray,
+        CryptoJS.enc.Utf8.parse(this.publicKey),
+        {
+          iv: CryptoJS.enc.Utf8.parse(this.iv),
+          mode: CryptoJS.mode.CBC,
+          padding: CryptoJS.pad.NoPadding,
+        }
+      );
 
-        let encrypted = CryptoJS.AES.encrypt(wordArray, this.publicKey, {
-          iv: this.iv,
-        });
+      console.log("encrypt result:");
+      console.log(encrypted.ciphertext);
 
-        console.log("encrypt result:");
-        console.log(encrypted.ciphertext);
+      let result = convertWordArrayToUint8Array(encrypted.ciphertext);
 
-        let result = convertWordArrayToUint8Array(encrypted.ciphertext);
-        let fileEnc = new Blob([result]); // Create blob from string
-
-        let a = document.createElement("a");
-        let url = window.URL.createObjectURL(fileEnc);
-        let filename = this.iv + ".enc";
-        a.href = url;
-        a.download = filename;
-        a.click();
-        window.URL.revokeObjectURL(url);
-      };
-
-      reader.readAsArrayBuffer(this.inputFile);
+      downloadBlob(
+        new Blob([result]),
+        `encrypt-by-crypto-js-${new Date().getTime()}.enc`
+      );
     },
 
-    decrypt() {
+    async decrypt() {
       if (!this.decodeFile) {
         return;
       }
 
-      const reader = new FileReader();
+      const fileArrBuffer = await readAsArrayBuffer(this.decodeFile);
+      // wordArray 已经是与encrypt后的结果一致了
+      let wordArray = CryptoJS.lib.WordArray.create(fileArrBuffer);
 
-      reader.onload = () => {
-        // wordArray 已经是与encrypt后的结果一致了
-        let wordArray = CryptoJS.lib.WordArray.create(reader.result);
+      console.log("get encrypt file result:");
+      console.log(wordArray);
 
-        console.log("get encrypt file result:");
-        console.log(wordArray);
+      // 直接将wordArray放入decrypt无法解密
+      let decrypted = CryptoJS.AES.decrypt(
+        CryptoJS.lib.CipherParams.create({
+          ciphertext: wordArray,
+        }),
+        CryptoJS.enc.Utf8.parse(this.publicKey),
+        {
+          iv: CryptoJS.enc.Utf8.parse(this.iv),
+          mode: CryptoJS.mode.CBC,
+          padding: CryptoJS.pad.NoPadding,
+        }
+      );
 
-        // 直接将wordArray放入decrypt无法解密
-        let decrypted = CryptoJS.AES.decrypt(wordArray, this.publicKey, {
-          iv: this.iv,
-        });
+      console.log("decrypted file result:");
+      console.log(decrypted);
 
-        console.log("decrypted file result:");
-        console.log(decrypted);
-
-        let result = convertWordArrayToUint8Array(decrypted);
-        let fileEnc = new Blob([result], {
-          type: "application/pdf",
-        }); // Create blob from string
-
-        console.log("after:", result);
-
-        let a = document.createElement("a");
-        let url = window.URL.createObjectURL(fileEnc);
-        let filename = `decrypted-${new Date().getTime()}.pdf`;
-        a.href = url;
-        a.download = filename;
-        a.click();
-        window.URL.revokeObjectURL(url);
-      };
-
-      reader.readAsArrayBuffer(this.decodeFile);
+      let result = convertWordArrayToUint8Array(decrypted);
+      downloadBlob(new Blob([result]), this.decryptedFileName);
     },
   },
   mounted() {},

@@ -86,3 +86,28 @@ export const stringToByte = (str) => {
   }
   return new Int8Array(bytes);
 };
+
+export const readAsBinaryString = (file) => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.readAsBinaryString(file);
+  });
+};
+
+export const readAsArrayBuffer = (file) => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.readAsArrayBuffer(file);
+  });
+};
+
+export const downloadBlob = (blob, filename) => {
+  let a = document.createElement("a");
+  let url = window.URL.createObjectURL(blob);
+  a.href = url;
+  a.download = filename;
+  a.click();
+  window.URL.revokeObjectURL(url);
+};

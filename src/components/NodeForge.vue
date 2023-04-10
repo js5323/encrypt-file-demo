@@ -1,10 +1,15 @@
 <template>
-  <div class="wrapper">
+  <div class="card">
     <h3 @click="show = !show">node-froge</h3>
     <div v-show="show" class="cont">
       <div>
         <label for="pad">Public Key:</label>
         <input v-model="publicKey" />
+      </div>
+
+      <div>
+        <label for="pad">IV:</label>
+        <input v-model="iv" />
       </div>
 
       <div>
@@ -19,6 +24,11 @@
         <input ref="file" type="file" @change="handleChange2" />
       </div>
 
+      <div>
+        <label for="pad">Decrypted File Name:</label>
+        <input v-model="decryptedFileName" />
+      </div>
+
       <button @click="decrypt">Decrypt</button>
     </div>
   </div>
@@ -26,7 +36,11 @@
 
 <script>
 import forge from "node-forge";
-import { convertBinaryStringToUint8Array } from "../utils";
+import {
+  convertBinaryStringToUint8Array,
+  downloadBlob,
+  readAsBinaryString,
+} from "../utils";
 
 window.forge = forge;
 
@@ -38,7 +52,8 @@ export default {
       iv: "a12xb42lab5nsjga",
       decodeFile: null,
       encrypted: null,
-      show: false,
+      show: true,
+      decryptedFileName: `decrypt-by-forge-${new Date().getTime()}.pdf`,
     };
   },
   methods: {
@@ -48,110 +63,44 @@ export default {
     handleChange2(e) {
       this.decodeFile = e.target.files[0];
     },
-    encrypt() {
+    async encrypt() {
       if (!this.inputFile) {
         return;
       }
 
-      const reader = new FileReader();
+      const fileBinaryString = await readAsBinaryString(this.inputFile);
+      // encrypt some bytes using CBC mode
+      // (other modes include: ECB, CFB, OFB, CTR, and GCM)
+      // Note: CBC and ECB modes use PKCS#7 padding as default
+      const cipher = forge.cipher.createCipher("AES-CBC", this.publicKey);
+      cipher.start({ iv: this.iv });
+      cipher.update(forge.util.createBuffer(fileBinaryString));
+      cipher.finish();
 
-      reader.onload = () => {
-        // encrypt some bytes using CBC mode
-        // (other modes include: ECB, CFB, OFB, CTR, and GCM)
-        // Note: CBC and ECB modes use PKCS#7 padding as default
-        var cipher = forge.cipher.createCipher("AES-CBC", this.publicKey);
-        cipher.start({ iv: this.iv });
-        cipher.update(forge.util.createBuffer(reader.result));
-        cipher.finish();
-        var encrypted = convertBinaryStringToUint8Array(cipher.output.bytes());
+      const encrypted = convertBinaryStringToUint8Array(cipher.output.bytes());
 
-        // console.group("encrypt source");
-        // console.log(reader.result);
-        // console.groupEnd();
-        // console.group("encrypt result");
-        // console.log(encrypted);
-        // console.groupEnd();
-
-        let fileEnc = new Blob([encrypted]); // Create blob from string
-
-        let a = document.createElement("a");
-        let url = window.URL.createObjectURL(fileEnc);
-        let filename = "encrypt-" + this.iv + ".enc";
-        a.href = url;
-        a.download = filename;
-        a.click();
-        window.URL.revokeObjectURL(url);
-      };
-
-      reader.readAsBinaryString(this.inputFile);
+      downloadBlob(
+        new Blob([encrypted]),
+        `encrypt-by-forge-${new Date().getTime()}.enc`
+      );
     },
 
-    decrypt() {
+    async decrypt() {
       if (!this.decodeFile) {
         return;
       }
 
-      const reader = new FileReader();
+      const fileBinaryString = await readAsBinaryString(this.decodeFile);
+      // decrypt some bytes using CBC mode
+      // (other modes include: CFB, OFB, CTR, and GCM)
+      var decipher = forge.cipher.createDecipher("AES-CBC", this.publicKey);
+      decipher.start({ iv: this.iv });
+      decipher.update(forge.util.createBuffer(fileBinaryString));
+      decipher.finish();
+      let decrypted = convertBinaryStringToUint8Array(decipher.output.bytes());
 
-      reader.onload = () => {
-        // decrypt some bytes using CBC mode
-        // (other modes include: CFB, OFB, CTR, and GCM)
-        var decipher = forge.cipher.createDecipher("AES-CBC", this.publicKey);
-        decipher.start({ iv: this.iv });
-        decipher.update(forge.util.createBuffer(reader.result));
-        decipher.finish();
-        let decrypted = convertBinaryStringToUint8Array(
-          decipher.output.bytes()
-        );
-
-        // console.group("read encrypt result");
-        // console.log(reader.result);
-        // console.groupEnd();
-
-        // reader.result should be same with encrypted bytes
-
-        // console.group("decrypt result");
-        // console.log(decrypted);
-        // console.groupEnd();
-
-        let fileDecrypt = new Blob([decrypted], {
-          type: "application/pdf",
-        });
-
-        let a = document.createElement("a");
-        let url = window.URL.createObjectURL(fileDecrypt);
-        let filename = `decrypted-${this.iv}.pdf`;
-        a.href = url;
-        a.download = filename;
-        a.click();
-        window.URL.revokeObjectURL(url);
-      };
-
-      reader.readAsBinaryString(this.decodeFile);
+      downloadBlob(new Blob([decrypted]), this.decryptedFileName);
     },
   },
 };
 </script>
-
-<style scoped lang="scss">
-.wrapper {
-  border: 1px solid #535bf2;
-  padding: 20px;
-  margin-bottom: 16px;
-
-  .cont {
-    border-top: 1px solid #535bf2;
-    padding-top: 15px;
-    margin-top: 15px;
-  }
-
-  h3 {
-    margin: 0;
-  }
-
-  input,
-  select {
-    margin-bottom: 16px;
-  }
-}
-</style>
